@@ -1,0 +1,337 @@
+{
+  "name": "WhatsApp Auto-Reply Bot",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-webhook",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.body.event}}",
+              "operation": "equals",
+              "value2": "messages.upsert"
+            }
+          ]
+        }
+      },
+      "id": "filter-new-messages",
+      "name": "Filter New Messages",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract message data\nconst messageData = $input.item.json.body.data;\n\nreturn {\n  remoteJid: messageData.key.remoteJid,\n  messageText: messageData.message?.conversation || messageData.message?.extendedTextMessage?.text || '',\n  fromMe: messageData.key.fromMe,\n  messageId: messageData.key.id\n};"
+      },
+      "id": "extract-message-data",
+      "name": "Extract Message Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.fromMe}}",
+              "value2": false
+            }
+          ]
+        }
+      },
+      "id": "filter-incoming-only",
+      "name": "Filter Incoming Only",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "mode": "chooseBranch",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "string": [
+                  {
+                    "value1": "={{$json.messageText.toLowerCase()}}",
+                    "operation": "contains",
+                    "value2": "hello"
+                  }
+                ]
+              },
+              "outputKey": "greeting"
+            },
+            {
+              "conditions": {
+                "string": [
+                  {
+                    "value1": "={{$json.messageText.toLowerCase()}}",
+                    "operation": "contains",
+                    "value2": "help"
+                  }
+                ]
+              },
+              "outputKey": "help"
+            },
+            {
+              "conditions": {
+                "string": [
+                  {
+                    "value1": "={{$json.messageText.toLowerCase()}}",
+                    "operation": "contains",
+                    "value2": "price"
+                  }
+                ]
+              },
+              "outputKey": "pricing"
+            }
+          ]
+        },
+        "fallbackOutput": "other"
+      },
+      "id": "route-by-keyword",
+      "name": "Route by Keyword",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "replyText",
+              "value": "👋 Hello! Welcome to our WhatsApp service. How can I help you today?\n\nType 'help' to see available commands."
+            }
+          ]
+        }
+      },
+      "id": "greeting-response",
+      "name": "Greeting Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "replyText",
+              "value": "📋 Available Commands:\n\n• Type 'hello' - Greeting message\n• Type 'help' - Show this help message\n• Type 'price' - View our pricing\n• Type 'contact' - Get contact information\n\nHow can I assist you?"
+            }
+          ]
+        }
+      },
+      "id": "help-response",
+      "name": "Help Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "replyText",
+              "value": "💰 Our Pricing:\n\n• Basic Plan: $29/month\n• Pro Plan: $99/month\n• Enterprise: Contact us\n\nAll plans include 24/7 support!"
+            }
+          ]
+        }
+      },
+      "id": "pricing-response",
+      "name": "Pricing Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [1250, 400]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "replyText",
+              "value": "Thank you for your message! 😊\n\nOur team will get back to you shortly. If you need immediate assistance, type 'help' to see available commands."
+            }
+          ]
+        }
+      },
+      "id": "default-response",
+      "name": "Default Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [1250, 500]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.EVOLUTION_API_URL}}/message/sendText/my-whatsapp-bot",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.EVOLUTION_API_KEY}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{$json.remoteJid}}\",\n  \"text\": \"{{$json.replyText}}\"\n}",
+        "options": {}
+      },
+      "id": "send-reply",
+      "name": "Send Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1450, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Filter New Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter New Messages": {
+      "main": [
+        [
+          {
+            "node": "Extract Message Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Message Data": {
+      "main": [
+        [
+          {
+            "node": "Filter Incoming Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Incoming Only": {
+      "main": [
+        [
+          {
+            "node": "Route by Keyword",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Keyword": {
+      "main": [
+        [
+          {
+            "node": "Greeting Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Help Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Pricing Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Default Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Greeting Response": {
+      "main": [
+        [
+          {
+            "node": "Send Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Help Response": {
+      "main": [
+        [
+          {
+            "node": "Send Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pricing Response": {
+      "main": [
+        [
+          {
+            "node": "Send Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Response": {
+      "main": [
+        [
+          {
+            "node": "Send Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-01-02T00:00:00.000Z",
+  "versionId": "1"
+}
